@@ -1,0 +1,4 @@
+Violet principal : #6B4CE6
+Rose : #FF6B9D
+Turquoise : #4ECDC4
+Orange : #FFA94D
