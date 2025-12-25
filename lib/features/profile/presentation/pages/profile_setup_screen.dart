@@ -11,30 +11,78 @@ class ProfileSetupScreen extends StatefulWidget {
 }
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
-  String? _selectedAgeRange;
-  bool? _hasFirstPeriod;
-  bool? _hasMenopause;
+  late PageController _pageController;
+  int _currentStep = 0;
+  
+  // Réponses
+  String?   _selectedAgeRange;
+  bool?   _hasFirstPeriod;
+  bool?  _hasMenopause;
+
+  final List<String> _ageRanges = [
+    '10-14 ans',
+    '15-17 ans',
+    '18-24 ans',
+    '25-34 ans',
+    '35-44 ans',
+    '45+ ans',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   bool get _canContinue {
-    return _selectedAgeRange != null &&
-        _hasFirstPeriod != null &&
-        _hasMenopause != null;
+    switch (_currentStep) {
+      case 0:
+        return _selectedAgeRange != null;
+      case 1:
+        return _hasFirstPeriod != null;
+      case 2:
+        return _hasMenopause != null;
+      default:  
+        return false;
+    }
+  }
+
+  void _nextStep() {
+    if (_currentStep < 2) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves. easeInOut,
+      );
+    } else {
+      _saveProfile();
+    }
+  }
+
+  void _previousStep() {
+    if (_currentStep > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   void _saveProfile() {
-    if (!_canContinue) return;
-
     final profile = UserProfile(
       ageRange: _selectedAgeRange!,
       hasFirstPeriod: _hasFirstPeriod!,
       hasMenopause: _hasMenopause!,
     );
 
-    print('Profil créé: $profile');
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Profil configuré avec succès !'),
+        content: const Text('✨ Profil configuré avec succès !'),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -45,17 +93,33 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         // TODO: Navigation vers Home
+        // context.go('/home');
       }
     });
   }
 
-  void _skipStep() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Configuration ignorée'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 1),
+  void _skipProfileSetup() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Passer cette étape ?'),
+        content: const Text(
+          'Tu pourras configurer ton profil plus tard pour une meilleure expérience personnalisée.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Continuer'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // TODO: Navigate to Home
+            },
+            child: const Text('Passer'),
+          ),
+        ],
       ),
     );
   }
@@ -63,361 +127,460 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        title: Text(
-          AppStrings.profileSetupTitle,
-          style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 23,
-              ),
-        ),
-        elevation: 0,
-        centerTitle: true,
-      ),
+      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                
-                // Description
-                Text(
-                  AppStrings.profileSetupDesc,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.5,
-                      ),
-                ),
-                
-                const SizedBox(height: 32),
-                
-                // Question 1: Âge avec dropdown élégant
-                _buildQuestionCard(
-                  icon: Icons.cake_outlined,
-                  iconColor: AppColors.secondary,
-                  title: AppStrings.questionAge,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _selectedAgeRange != null
-                            ? AppColors.primary.withOpacity(0.3)
-                            : Colors.grey.shade300,
-                      ),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedAgeRange,
-                        hint: Text(
-                          'Sélectionne ta tranche d\'âge',
-                          style: TextStyle(
-                            color: AppColors.textLight,
-                            fontSize: 15,
-                          ),
+        child: Column(
+          children: [
+            // Header avec progress bar et skip button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Skip button en haut
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: TextButton(
+                      onPressed:  _skipProfileSetup,
+                      child: Text(
+                        'Passer',
+                        style: Theme.of(context).textTheme.bodyLarge?. copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
                         ),
-                        isExpanded: true,
-                        icon: Icon(
-                          Icons.keyboard_arrow_down,
-                          color: AppColors.primary,
-                        ),
-                        items: AppStrings.ageRanges.map((String age) {
-                          return DropdownMenuItem<String>(
-                            value: age,
-                            child: Text(
-                              age,
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? value) {
-                          setState(() {
-                            _selectedAgeRange = value;
-                          });
-                        },
                       ),
                     ),
                   ),
-                ),
-                
-                const SizedBox(height: 20),
-                
-                // Question 2: Premières règles
-                _buildQuestionCard(
-                  icon: Icons.water_drop_outlined,
-                  iconColor: AppColors.categoryMenstruation,
-                  title: AppStrings.questionFirstPeriod,
-                  subtitle: 'Avez-vous déjà eu vos premières règles ?',
-                  child: _buildToggleOption(
-                    value: _hasFirstPeriod,
-                    onChanged: (value) {
-                      setState(() {
-                        _hasFirstPeriod = value;
-                      });
-                    },
+                  const SizedBox(height: 16),
+                  
+                  // Titre
+                  Text(
+                    'Parle-nous de toi',
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                
-                const SizedBox(height: 20),
-                
-                // Question 3: Ménopause
-                _buildQuestionCard(
-                  icon: Icons.spa_outlined,
-                  iconColor: AppColors.tertiary,
-                  title: AppStrings.questionMenopause,
-                  subtitle: 'Êtes-vous en période de ménopause ou post-ménopause ?',
-                  child: _buildToggleOption(
-                    value: _hasMenopause,
-                    onChanged: (value) {
-                      setState(() {
-                        _hasMenopause = value;
-                      });
-                    },
+                  const SizedBox(height: 8),
+                  
+                  // Sous-titre
+                  Text(
+                    'Pour te proposer un contenu adapté à tes besoins',
+                    style:  Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
-                
-                const SizedBox(height: 40),
-                
-                // Bouton Continuer
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _canContinue ? _saveProfile : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                  const SizedBox(height: 24),
+                  
+                  // Progress bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: (_currentStep + 1) / 3,
+                      minHeight: 6,
+                      backgroundColor: AppColors.surface,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
                       ),
-                      elevation: _canContinue ? 2 : 0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          AppStrings.continueButton,
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            color: _canContinue ? Colors.white : Colors.grey.shade500,
-                          ),
-                        ),
-                        if (_canContinue) ...[
-                          const SizedBox(width: 8),
-                          const Icon(Icons.arrow_forward, size: 20, color: Colors.white),
-                        ],
-                      ],
                     ),
                   ),
-                ),
-                
-                const SizedBox(height: 12),
-                
-                // Bouton Passer cette étape
-                Center(
-                  child: TextButton(
-                    onPressed: _skipStep,
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    ),
-                    child: Text(
-                      AppStrings.skipStep,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
+                  const SizedBox(height: 12),
+                  
+                  // Étape courante
+                  Text(
+                    'Étape ${_currentStep + 1}/3',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
-                ),
-                
-                const SizedBox(height: 32),
-              ],
+                ],
+              ),
             ),
-          ),
+            
+            // Contenu des étapes
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentStep = index;
+                  });
+                },
+                children: [
+                  // Étape 1 :  Âge
+                  _buildAgeStep(),
+                  
+                  // Étape 2 : Première menstruation
+                  _buildFirstPeriodStep(),
+                  
+                  // Étape 3 : Ménopause
+                  _buildMenopauseStep(),
+                ],
+              ),
+            ),
+            
+            // Boutons d'action
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+              child: Row(
+                children: [
+                  // Bouton Retour
+                  if (_currentStep > 0)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _previousStep,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: AppColors.primary,
+                            width: 2,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: const Text('Retour'),
+                      ),
+                    ),
+                  
+                  if (_currentStep > 0) const SizedBox(width: 12),
+                  
+                  // Bouton Suivant/Terminer
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _canContinue ? _nextStep :  null,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: Text(
+                        _currentStep < 2 ? 'Suivant' : 'Terminer',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildQuestionCard({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    String? subtitle,
-    required Widget child,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+  Widget _buildAgeStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment:  CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 32),
+          
+          // Icône
+          Center(
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors. secondary. withOpacity(0.1),
+              ),
+              child:  const Icon(
+                Icons.cake_outlined,
+                size: 40,
+                color: AppColors. secondary,
+              ),
+            ),
           ),
+          
+          const SizedBox(height: 32),
+          
+          // Titre
+          Text(
+            'Quelle est ta tranche d\'âge ?',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Options d'âge en grille
+          ..._ageRanges.map((age) {
+            final isSelected = _selectedAgeRange == age;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedAgeRange = age;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration:  BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: isSelected ? AppColors.secondary. withOpacity(0.1) : AppColors.surface,
+                    border: Border.all(
+                      color: isSelected ? AppColors.secondary : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? AppColors. secondary : AppColors.textLight,
+                            width: 2,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: AppColors.secondary,
+                        )
+                            : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        age,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: isSelected ? AppColors.secondary : AppColors.textPrimary,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight. normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+          
+          const SizedBox(height: 40),
         ],
       ),
+    );
+  }
+
+  Widget _buildFirstPeriodStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SizedBox(height: 32),
+          
+          // Icône
+          Center(
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape. circle,
+                color: AppColors.categoryMenstruation. withOpacity(0.1),
+              ),
+              child: const Icon(
+                Icons.favorite_outline,
+                size: 40,
+                color: AppColors.categoryMenstruation,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 32),
+          
+          // Titre
+          Text(
+            'As-tu eu tes premières règles ?',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // Sous-titre
+          Text(
+            'Cela nous aidera à adapter les informations',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          const SizedBox(height: 48),
+          
+          // Boutons Oui/Non (taille réduite)
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 22,
+              Expanded(
+                child: _buildYesNoButton(
+                  label: 'Oui',
+                  icon: Icons.check_circle_outline,
+                  isSelected: _hasFirstPeriod == true,
+                  onTap: () {
+                    setState(() {
+                      _hasFirstPeriod = true;
+                    });
+                  },
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ],
+                child: _buildYesNoButton(
+                  label: 'Non',
+                  icon: Icons.cancel_outlined,
+                  isSelected: _hasFirstPeriod == false,
+                  onTap: () {
+                    setState(() {
+                      _hasFirstPeriod = false;
+                    });
+                  },
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          child,
+          
+          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  Widget _buildToggleOption({
-    required bool? value,
-    required Function(bool) onChanged,
+  Widget _buildMenopauseStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 32),
+          
+          // Icône
+          Center(
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.tertiary.withOpacity(0.1),
+              ),
+              child: const Icon(
+                Icons. wb_sunny_outlined,
+                size: 40,
+                color: AppColors. tertiary,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 32),
+          
+          // Titre
+          Text(
+            'Es-tu en ménopause ou en péri-ménopause ?',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign:  TextAlign.center,
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // Sous-titre
+          Text(
+            'Sans jugement, c\'est juste pour te conseiller au mieux',
+            style: Theme. of(context).textTheme.bodyLarge?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          
+          const SizedBox(height: 48),
+          
+          // Boutons Oui/Non (taille réduite)
+          Row(
+            children: [
+              Expanded(
+                child: _buildYesNoButton(
+                  label: 'Oui',
+                  icon: Icons. check_circle_outline,
+                  isSelected: _hasMenopause == true,
+                  onTap: () {
+                    setState(() {
+                      _hasMenopause = true;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildYesNoButton(
+                  label: 'Non',
+                  icon:  Icons.cancel_outlined,
+                  isSelected: _hasMenopause == false,
+                  onTap: () {
+                    setState(() {
+                      _hasMenopause = false;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildYesNoButton({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
   }) {
-    return Row(
-      children: [
-        Expanded(
-          child: GestureDetector(
-            onTap: () => onChanged(true),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                color: value == true
-                    ? AppColors.primary.withOpacity(0.1)
-                    : Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: value == true
-                      ? AppColors.primary
-                      : Colors.grey.shade300,
-                  width: 1.5,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (value == true)
-                    Icon(
-                      Icons.check_circle,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                  if (value == true) const SizedBox(width: 8),
-                  Text(
-                    AppStrings.yes,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: value == true
-                          ? AppColors.primary
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? AppColors.primary. withOpacity(0.1) : AppColors.surface,
+          border: Border.all(
+            color: isSelected ? AppColors. primary : Colors.transparent,
+            width: 2,
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: GestureDetector(
-            onTap: () => onChanged(false),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: value == false
-                    ? AppColors.textSecondary.withOpacity(0.1)
-                    : Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: value == false
-                      ? AppColors.textSecondary
-                      : Colors.grey.shade300,
-                  width: 1.5,
-                ),
+                shape: BoxShape.circle,
+                color: isSelected ?  AppColors.primary : AppColors. textLight. withOpacity(0.2),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (value == false)
-                    Icon(
-                      Icons.check_circle,
-                      color: AppColors.textSecondary,
-                      size: 20,
-                    ),
-                  if (value == false) const SizedBox(width: 8),
-                  Text(
-                    AppStrings.no,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: value == false
-                          ? AppColors.textSecondary
-                          : AppColors.textSecondary.withOpacity(0.5),
-                    ),
-                  ),
-                ],
+              child: Icon(
+                icon,
+                size: 20,
+                color: isSelected ?  Colors.white : AppColors.textLight,
               ),
             ),
-          ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style:  Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                fontWeight:  isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
